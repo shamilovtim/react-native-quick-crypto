@@ -22,6 +22,7 @@ import type {
   // CipherOCBTypes,
   // CipherOCBOptions,
 } from 'crypto'; // Node crypto typings
+import { StringDecoder } from './NativeFastCrypto/StringDecoder';
 
 const createInternalCipher = NativeFastCrypto.createCipher;
 const createInternalDecipher = NativeFastCrypto.createDecipher;
@@ -37,9 +38,17 @@ function getUIntOption(options: Record<string, any>, key: string) {
   return -1;
 }
 
+function getDecoder(decoder: StringDecoder | undefined, encoding: string) {
+  decoder = decoder ?? new StringDecoder(encoding);
+
+  return decoder;
+}
+
 class CipherCommon extends Stream.Transform {
   private internal: InternalCipher;
   private options: any;
+
+  protected _decoder: StringDecoder | undefined;
 
   constructor(
     cipherType: string,
@@ -102,7 +111,8 @@ class CipherCommon extends Stream.Transform {
     const ret = this.internal.update(data);
 
     if (outputEncoding && outputEncoding !== 'buffer') {
-      return ab2str(ret, outputEncoding);
+      this._decoder = getDecoder(this._decoder, outputEncoding);
+      return this._decoder.write(Buffer.from(ret));
     }
 
     return ret;
@@ -114,7 +124,8 @@ class CipherCommon extends Stream.Transform {
     const ret = this.internal.final();
 
     if (outputEncoding && outputEncoding !== 'buffer') {
-      return ab2str(ret, outputEncoding);
+      this._decoder = getDecoder(this._decoder, outputEncoding);
+      return this._decoder.end(Buffer.from(ret));
     }
 
     return ret;
